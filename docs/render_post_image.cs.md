@@ -5,12 +5,13 @@ Tento skript je zodpovědný za vykreslení obrázku příspěvku na Redditu z p
 
 ## Závislosti
 
-Tento skript vyžaduje Python knihovnu `pyppeteer`.
+Tento skript vyžaduje Python knihovnu `imgkit` a `wkhtmltoimage`.
 
-- **pyppeteer**: Tuto knihovnu můžete nainstalovat pomocí pipu:
+- **imgkit**: Tuto knihovnu můžete nainstalovat pomocí pipu:
   ```bash
-  pip install pyppeteer
+  pip install imgkit
   ```
+- **wkhtmltoimage**: Jedná se o nástroj příkazového řádku, který `imgkit` používá k vykreslení HTML do obrázku. Musíte si jej stáhnout z [https://wkhtmltopdf.org/downloads.html](https://wkhtmltopdf.org/downloads.html). Cesta ke spustitelnému souboru je v skriptu napevno zakódována, takže se musíte ujistit, že je nainstalován v `C:\Program Files\wkhtmltopdf\bin\wkhtmltoimage.exe`.
 
 ## Funkce
 
@@ -25,7 +26,7 @@ Tato funkce najde nejnověji vytvořený soubor s příběhem v adresáři `stor
 
 ### `render_post_image(story_data)`
 
-Tato funkce vezme příběh a vykreslí ho jako obrázek PNG. K úpravě stylu obrázku používá šablonu HTML (`templates/reddit_post.html`) a soubor CSS (`templates/reddit_post.css`). Tato funkce je asynchronní.
+Tato funkce vezme příběh a vykreslí ho jako obrázek PNG. K úpravě stylu obrázku používá šablonu HTML (`templates/reddit_post.html`) a soubor CSS (`templates/reddit_post.css`).
 
 #### Parametry
 
