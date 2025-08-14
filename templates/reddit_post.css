@@ -1,0 +1,49 @@
+
+body {
+    font-family: sans-serif;
+    background-color: #dae0e6;
+}
+
+.post {
+    width: 800px;
+    margin: 20px auto;
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #ccc;
+}
+
+.subreddit {
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.username {
+    color: #888;
+}
+
+.post-title {
+    font-size: 24px;
+    font-weight: bold;
+    padding: 10px;
+}
+
+.post-body {
+    padding: 10px;
+    line-height: 1.5;
+}
+
+.post-footer {
+    padding: 10px;
+    border-top: 1px solid #ccc;
+}
+
+.upvotes {
+    font-weight: bold;
+}
