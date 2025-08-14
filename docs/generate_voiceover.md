@@ -16,6 +16,8 @@ This script requires the `elevenlabs` and `python-dotenv` Python libraries.
     pip install python-dotenv
     ```
 
+The script imports the ElevenLabs client specifically from `elevenlabs.client`.
+
 ## API Key
 
 To use this script, you need an ElevenLabs API key. You can get one from the [ElevenLabs website](https://elevenlabs.io/). You need to create a `.env` file in the root of the project and add the following line to it, replacing `your_api_key` with your actual API key:
@@ -41,7 +43,16 @@ This function takes a story and generates a voiceover from it using the ElevenLa
 
 #### Parameters
 
-- `story_data` (dict): The story to be used for the voiceover.
+- `story_data` (dict): The story dictionary containing at least a "story" field with the text to be converted to speech.
+
+#### Implementation Details
+
+- Uses voice ID `"JBFqnCBsd6RMkjVDRZzb"` and model `"eleven_multilingual_v2"`
+- Extracts the text from `story_data["story"]` field specifically
+- Creates the `voices/` directory if it doesn't exist
+- Generates filename using current timestamp (e.g., `1678886400.mp3`)
+- Includes error handling for API failures
+- Prints success/error messages to console
 
 ## Usage
 

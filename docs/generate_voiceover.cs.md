@@ -16,6 +16,8 @@ Tento skript vyžaduje Python knihovny `elevenlabs` a `python-dotenv`.
     pip install python-dotenv
     ```
 
+Skript importuje ElevenLabs klienta specificky z `elevenlabs.client`.
+
 ## API klíč
 
 Pro použití tohoto skriptu potřebujete API klíč od ElevenLabs. Můžete ho získat na [webových stránkách ElevenLabs](https://elevenlabs.io/). Musíte vytvořit soubor `.env` v kořenovém adresáři projektu a přidat do něj následující řádek, přičemž `your_api_key` nahradíte svým skutečným klíčem API:
@@ -41,7 +43,16 @@ Tato funkce vezme příběh a vygeneruje z něj hlasový komentář pomocí Elev
 
 #### Parametry
 
-- `story_data` (dict): Příběh, který se má použít pro hlasový komentář.
+- `story_data` (dict): Slovník s příběhem obsahující alespoň pole "story" s textem, který se má převést na řeč.
+
+#### Detaily implementace
+
+- Používá hlasové ID `"JBFqnCBsd6RMkjVDRZzb"` a model `"eleven_multilingual_v2"`
+- Extrahuje text specificky z pole `story_data["story"]`
+- Vytvoří adresář `voices/`, pokud neexistuje
+- Generuje název souboru pomocí aktuálního časového razítka (např. `1678886400.mp3`)
+- Zahrnuje zpracování chyb pro selhání API
+- Vypisuje zprávy o úspěchu/chybě do konzole
 
 ## Použití
 
