@@ -5,16 +5,24 @@ This script is responsible for generating a voiceover from a story using the Ele
 
 ## Dependencies
 
-This script requires the `elevenlabs` Python library.
+This script requires the `elevenlabs` and `python-dotenv` Python libraries.
 
 - **elevenlabs**: You can install this library using pip:
   ```bash
   pip install elevenlabs
   ```
+- **python-dotenv**: You can install this library using pip:
+    ```bash
+    pip install python-dotenv
+    ```
 
 ## API Key
 
-To use this script, you need an ElevenLabs API key. You can get one from the [ElevenLabs website](https://elevenlabs.io/). Once you have your API key, you need to set it as an environment variable named `ELEVENLABS_API_KEY`.
+To use this script, you need an ElevenLabs API key. You can get one from the [ElevenLabs website](https://elevenlabs.io/). You need to create a `.env` file in the root of the project and add the following line to it, replacing `your_api_key` with your actual API key:
+
+```
+ELEVENLABS_API_KEY="your_api_key"
+```
 
 ## Functions
 

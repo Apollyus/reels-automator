@@ -5,16 +5,24 @@ Tento skript je zodpovědný za generování hlasového komentáře z příběhu
 
 ## Závislosti
 
-Tento skript vyžaduje Python knihovnu `elevenlabs`.
+Tento skript vyžaduje Python knihovny `elevenlabs` a `python-dotenv`.
 
 - **elevenlabs**: Tuto knihovnu můžete nainstalovat pomocí pipu:
   ```bash
   pip install elevenlabs
   ```
+- **python-dotenv**: Tuto knihovnu můžete nainstalovat pomocí pipu:
+    ```bash
+    pip install python-dotenv
+    ```
 
 ## API klíč
 
-Pro použití tohoto skriptu potřebujete API klíč od ElevenLabs. Můžete ho získat na [webových stránkách ElevenLabs](https://elevenlabs.io/). Jakmile budete mít svůj API klíč, musíte ho nastavit jako proměnnou prostředí s názvem `ELEVENLABS_API_KEY`.
+Pro použití tohoto skriptu potřebujete API klíč od ElevenLabs. Můžete ho získat na [webových stránkách ElevenLabs](https://elevenlabs.io/). Musíte vytvořit soubor `.env` v kořenovém adresáři projektu a přidat do něj následující řádek, přičemž `your_api_key` nahradíte svým skutečným klíčem API:
+
+```
+ELEVENLABS_API_KEY="your_api_key"
+```
 
 ## Funkce
 

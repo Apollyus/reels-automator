@@ -1,8 +1,13 @@
 
 import os
 import json
-from elevenlabs import generate, set_api_key
+import os
+import json
+from elevenlabs.client import ElevenLabs
+from dotenv import load_dotenv
 import time
+
+load_dotenv()
 
 def get_latest_story_file():
     """
@@ -35,8 +40,10 @@ def generate_voiceover(story_data):
     if not api_key:
         print("Error: ELEVENLABS_API_KEY environment variable not set.")
         return
-
-    set_api_key(api_key)
+    
+    elevenlabs = ElevenLabs(
+        api_key=os.getenv("ELEVENLABS_API_KEY"),
+    )
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
@@ -48,13 +55,14 @@ def generate_voiceover(story_data):
     output_path = os.path.join(voices_dir, f"{timestamp}.mp3")
 
     try:
-        audio = generate(
+        audio = elevenlabs.text_to_speech.convert(
             text=story_data["story"],
-            voice="Bella",  # You can change the voice here
-            model="eleven_multilingual_v2"
+            voice_id="JBFqnCBsd6RMkjVDRZzb",
+            model_id="eleven_multilingual_v2",
         )
         with open(output_path, "wb") as f:
-            f.write(audio)
+            for chunk in audio:
+                f.write(chunk)
         print(f"Voiceover saved to {output_path}")
     except Exception as e:
         print(f"Error generating voiceover: {e}")
