@@ -1,0 +1,27 @@
+# Minecraft Reddit Story Reels Generator - Python Dependencies
+
+# Core API Dependencies
+elevenlabs>=1.0.0         # ElevenLabs Text-to-Speech API
+python-dotenv>=1.0.0      # Environment variable management
+
+# Web and HTML Processing
+playwright>=1.40.0        # Browser automation for HTML to image rendering
+beautifulsoup4>=4.12.0    # HTML parsing
+lxml>=4.9.0               # XML/HTML processing backend
+
+# File and Data Processing
+hashlib2>=1.0.0           # Enhanced hashing (fallback to built-in hashlib if not available)
+json5>=0.9.0              # Enhanced JSON parsing (fallback to built-in json if not available)
+
+# Optional: Enhanced Story Generation (placeholder for future LLM integration)
+# openai>=1.0.0           # OpenAI GPT API (uncomment when implementing real story generation)
+# anthropic>=0.5.0        # Anthropic Claude API (alternative for story generation)
+
+# System Dependencies (ensure these are installed)
+# ffmpeg                  # Video composition (install via system package manager)
+# chromium               # Browser engine for Playwright (auto-installed by Playwright)
+
+# Development Dependencies (optional)
+pytest>=7.0.0            # Testing framework
+black>=23.0.0            # Code formatting
+flake8>=6.0.0           # Code linting
