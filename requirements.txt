@@ -6,12 +6,9 @@ python-dotenv>=1.0.0      # Environment variable management
 
 # Web and HTML Processing
 playwright>=1.40.0        # Browser automation for HTML to image rendering
-beautifulsoup4>=4.12.0    # HTML parsing
-lxml>=4.9.0               # XML/HTML processing backend
 
 # File and Data Processing
-hashlib2>=1.0.0           # Enhanced hashing (fallback to built-in hashlib if not available)
-json5>=0.9.0              # Enhanced JSON parsing (fallback to built-in json if not available)
+# Note: hashlib and json are built-in Python modules
 
 # Optional: Enhanced Story Generation (placeholder for future LLM integration)
 # openai>=1.0.0           # OpenAI GPT API (uncomment when implementing real story generation)
