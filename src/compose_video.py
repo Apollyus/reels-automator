@@ -352,28 +352,26 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         # Create temp video without subtitles first
         temp_video = output_path.replace('.mp4', '_temp.mp4')
         
-        # Step 1: Create video without subtitles - with Reddit post as overlay
+        # Step 1: Create video without subtitles - simple overlay approach
         cmd1 = [
             ffmpeg_path, "-y",  # Overwrite output file
             
-            # Input 1: Opening image (Reddit post)
-            "-loop", "1", "-i", opening_image_path, "-t", str(actual_opening_duration),
-            
-            # Input 2: Background video
+            # Input 1: Background video (main video throughout)
             "-i", background_video_path,
+            
+            # Input 2: Reddit post image
+            "-loop", "1", "-i", opening_image_path,
             
             # Input 3: Combined audio (full audio track)
             "-i", combined_voice_path,
             
-            # Filter complex to create overlay effect
+            # Filter complex: background video with timed overlay
             "-filter_complex",
-            f"[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg_full];"
-            f"[0:v]scale=1000:-1:force_original_aspect_ratio=decrease[post_scaled];"
-            f"[bg_full][post_scaled]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,{title_end_time})'[opening_with_overlay];"
-            f"[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg_only];"
-            f"[opening_with_overlay][bg_only]concat=n=2:v=1:a=0[video]",
+            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg];"
+            f"[1:v]scale=1000:-1:force_original_aspect_ratio=decrease[post];"
+            f"[bg][post]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,{title_end_time})'[video]",
             
-            # Map the video and audio (audio from input 3)
+            # Map the video and audio
             "-map", "[video]", "-map", "2:a",
             
             # Video settings for social media (vertical format)
