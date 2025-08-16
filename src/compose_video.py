@@ -4,6 +4,41 @@ import subprocess
 import time
 from pathlib import Path
 
+def find_ffmpeg_path():
+    """
+    Find FFmpeg/ffprobe executable path on Windows.
+    
+    Returns:
+        tuple: (ffmpeg_path, ffprobe_path) or (None, None) if not found
+    """
+    # Common Windows locations for FFmpeg
+    common_paths = [
+        # WinGet installation path
+        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'WinGet', 'Links'),
+        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Microsoft', 'WinGet', 'Packages', 'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe', 'ffmpeg-7.1.1-full_build', 'bin'),
+        # Program Files locations
+        r'C:\Program Files\ffmpeg\bin',
+        r'C:\Program Files (x86)\ffmpeg\bin',
+        # User PATH locations
+        r'C:\ffmpeg\bin',
+    ]
+    
+    # First try system PATH
+    try:
+        subprocess.run(['ffprobe', '-version'], capture_output=True, check=True)
+        return 'ffmpeg', 'ffprobe'
+    except:
+        pass
+    
+    # Search common installation paths
+    for path in common_paths:
+        ffmpeg_exe = os.path.join(path, 'ffmpeg.exe')
+        ffprobe_exe = os.path.join(path, 'ffprobe.exe')
+        if os.path.exists(ffmpeg_exe) and os.path.exists(ffprobe_exe):
+            return ffmpeg_exe, ffprobe_exe
+    
+    return None, None
+
 def get_latest_story_file():
     """
     Gets the path to the latest story file in the 'stories' directory.
@@ -135,8 +170,13 @@ def get_audio_duration(audio_path):
         float: Duration in seconds, or None if error.
     """
     try:
+        ffmpeg_path, ffprobe_path = find_ffmpeg_path()
+        if not ffprobe_path:
+            print("FFprobe not found. Please install FFmpeg.")
+            return None
+            
         cmd = [
-            "ffprobe", "-v", "quiet", "-show_entries", "format=duration",
+            ffprobe_path, "-v", "quiet", "-show_entries", "format=duration",
             "-of", "csv=p=0", audio_path
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -147,13 +187,14 @@ def get_audio_duration(audio_path):
 
 def compose_final_video(background_video_path, opening_image_path, title_voice_path, story_voice_path, captions_path, output_path, opening_duration=3.0):
     """
-    Composes the final video using FFmpeg with separate title and story audio.
+    Composes the final video using FFmpeg with combined audio.
+    Note: title_voice_path and story_voice_path now point to the same combined audio file.
 
     Args:
         background_video_path (str): Path to the background Minecraft video.
         opening_image_path (str): Path to the opening Reddit post image.
-        title_voice_path (str): Path to the title voiceover audio.
-        story_voice_path (str): Path to the story voiceover audio.
+        title_voice_path (str): Path to the combined voiceover audio (same as story_voice_path).
+        story_voice_path (str): Path to the combined voiceover audio (same as title_voice_path).
         captions_path (str): Path to the SRT caption file.
         output_path (str): Path for the output video.
         opening_duration (float): Duration to show opening image (default: 3.0 seconds).
@@ -162,58 +203,57 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         bool: True if successful, False otherwise.
     """
     try:
-        # Get audio durations
-        title_duration = get_audio_duration(title_voice_path)
-        story_duration = get_audio_duration(story_voice_path)
-        
-        if not title_duration or not story_duration:
-            print("Failed to get audio durations")
+        # Find FFmpeg executable
+        ffmpeg_path, ffprobe_path = find_ffmpeg_path()
+        if not ffmpeg_path:
+            print("FFmpeg not found. Please install FFmpeg.")
             return False
         
-        # Calculate timing
-        total_duration = title_duration + story_duration
-        # Use title duration for opening image, but ensure minimum of opening_duration
-        actual_opening_duration = max(title_duration, opening_duration)
+        # Get audio duration (both paths point to same file now)
+        total_audio_duration = get_audio_duration(title_voice_path)
         
-        print(f"Title duration: {title_duration:.2f} seconds")
-        print(f"Story duration: {story_duration:.2f} seconds")
-        print(f"Total duration: {total_duration:.2f} seconds")
+        if not total_audio_duration:
+            print("Failed to get audio duration")
+            return False
+        
+        # Use fixed opening duration, then remaining time for background
+        actual_opening_duration = max(opening_duration, 3.0)  # Minimum 3 seconds
+        background_duration = total_audio_duration - actual_opening_duration
+        
+        print(f"Total audio duration: {total_audio_duration:.2f} seconds")
         print(f"Opening image duration: {actual_opening_duration:.2f} seconds")
+        print(f"Background video duration: {background_duration:.2f} seconds")
         
         # Convert paths to use forward slashes for FFmpeg
         background_video_path = background_video_path.replace('\\', '/')
         opening_image_path = opening_image_path.replace('\\', '/')
-        title_voice_path = title_voice_path.replace('\\', '/')
-        story_voice_path = story_voice_path.replace('\\', '/')
-        captions_path = captions_path.replace('\\', '/')
+        combined_voice_path = title_voice_path.replace('\\', '/')  # Use combined audio
         output_path = output_path.replace('\\', '/')
         
-        # Complex FFmpeg command to create the final video
-        cmd = [
-            "ffmpeg", "-y",  # Overwrite output file
+        # Create temp video without subtitles first
+        temp_video = output_path.replace('.mp4', '_temp.mp4')
+        
+        # Step 1: Create video without subtitles - SIMPLIFIED with single audio
+        cmd1 = [
+            ffmpeg_path, "-y",  # Overwrite output file
             
-            # Input 1: Opening image (convert to video with title duration)
+            # Input 1: Opening image (convert to video with opening duration)
             "-loop", "1", "-i", opening_image_path, "-t", str(actual_opening_duration),
             
             # Input 2: Background video
             "-i", background_video_path,
             
-            # Input 3: Title audio
-            "-i", title_voice_path,
+            # Input 3: Combined audio (full audio track)
+            "-i", combined_voice_path,
             
-            # Input 4: Story audio
-            "-i", story_voice_path,
-            
-            # Filter complex to combine everything
+            # Filter complex to combine everything with single audio
             "-filter_complex",
             f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[opening];"
             f"[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg];"
-            f"[opening][bg]concat=n=2:v=1:a=0[video];"
-            f"[2:a][3:a]concat=n=2:v=0:a=1[audio];"
-            f"[video]subtitles='{captions_path}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'[final_video]",
+            f"[opening][bg]concat=n=2:v=1:a=0[video]",
             
-            # Map the final video and audio
-            "-map", "[final_video]", "-map", "[audio]",
+            # Map the video and audio (audio from input 3)
+            "-map", "[video]", "-map", "2:a",
             
             # Video settings for social media (vertical format)
             "-c:v", "libx264", "-preset", "medium", "-crf", "23",
@@ -223,17 +263,56 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
             "-c:a", "aac", "-b:a", "128k",
             
             # Duration (match total audio duration)
-            "-t", str(total_duration),
+            "-t", str(total_audio_duration),
             
-            # Output
+            # Output temp video
+            temp_video
+        ]
+        
+        print("Running FFmpeg command (Step 1: Video without subtitles)...")
+        result = subprocess.run(cmd1, capture_output=True, text=True, check=True)
+        
+        # Step 2: Add subtitles to the video
+        # Use relative path for subtitles to avoid Windows path issues
+        rel_captions_path = os.path.relpath(captions_path).replace('\\', '/')
+        
+        cmd2 = [
+            ffmpeg_path, "-y",
+            "-i", temp_video,
+            "-vf", f"subtitles='{rel_captions_path}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
+            "-c:a", "copy",  # Copy audio without re-encoding
             output_path
         ]
         
-        print("Running FFmpeg command...")
-        print(" ".join(cmd))
+        print("Running FFmpeg command (Step 2: Adding subtitles)...")
+        result = subprocess.run(cmd2, capture_output=True, text=True, check=True)
         
-        # Run FFmpeg
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        # Clean up temp file
+        if os.path.exists(temp_video):
+            os.remove(temp_video)
+        
+        print("Running FFmpeg command (Step 1: Video without subtitles)...")
+        result = subprocess.run(cmd1, capture_output=True, text=True, check=True)
+        
+        # Step 2: Add subtitles to the video
+        # Use relative path for subtitles to avoid Windows path issues
+        rel_captions_path = os.path.relpath(captions_path).replace('\\', '/')
+        
+        cmd2 = [
+            ffmpeg_path, "-y",
+            "-i", temp_video,
+            "-vf", f"subtitles='{rel_captions_path}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
+            "-c:a", "copy",  # Copy audio without re-encoding
+            output_path
+        ]
+        
+        print("Running FFmpeg command (Step 2: Adding subtitles)...")
+        result = subprocess.run(cmd2, capture_output=True, text=True, check=True)
+        
+        # Clean up temp file
+        if os.path.exists(temp_video):
+            os.remove(temp_video)
+            
         
         print("Video composition completed successfully!")
         return True

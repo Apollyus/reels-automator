@@ -65,34 +65,8 @@ def generate_voiceover(story_data):
     results = {}
 
     try:
-        # Generate title voiceover
-        print("Generating title voiceover...")
-        title_audio = elevenlabs.text_to_speech.convert(
-            text=story_data["title"],
-            voice_id="JBFqnCBsd6RMkjVDRZzb",
-            model_id="eleven_multilingual_v2",
-        )
-        with open(title_path, "wb") as f:
-            for chunk in title_audio:
-                f.write(chunk)
-        print(f"Title voiceover saved to {title_path}")
-        results['title'] = title_path
-        
-        # Generate story voiceover
-        print("Generating story voiceover...")
-        story_audio = elevenlabs.text_to_speech.convert(
-            text=story_data["story"],
-            voice_id="JBFqnCBsd6RMkjVDRZzb",
-            model_id="eleven_multilingual_v2",
-        )
-        with open(story_path, "wb") as f:
-            for chunk in story_audio:
-                f.write(chunk)
-        print(f"Story voiceover saved to {story_path}")
-        results['story'] = story_path
-        
-        # Generate combined voiceover (title + story)
-        print("Generating combined voiceover...")
+        # Generate combined voiceover (title + story) - SINGLE API CALL
+        print("Generating voiceover...")
         combined_text = f"{story_data['title']}. {story_data['story']}"
         combined_audio = elevenlabs.text_to_speech.convert(
             text=combined_text,
@@ -102,8 +76,13 @@ def generate_voiceover(story_data):
         with open(combined_path, "wb") as f:
             for chunk in combined_audio:
                 f.write(chunk)
-        print(f"Combined voiceover saved to {combined_path}")
-        results['combined'] = combined_path
+        print(f"Voiceover saved to {combined_path}")
+        
+        # For backward compatibility, return all three paths pointing to the same file
+        # The video composition can use timing to determine when to play what
+        results['title'] = combined_path     # Use same file, extract timing later
+        results['story'] = combined_path     # Use same file, extract timing later  
+        results['combined'] = combined_path  # The actual generated file
         
         return results
         

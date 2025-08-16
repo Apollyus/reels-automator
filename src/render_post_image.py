@@ -91,13 +91,13 @@ def render_post_image(story_data):
             browser.close()
             
         print(f"Image saved to {image_path}")
-        return True
+        return image_path  # Return the path to the generated image
         
     except Exception as e:
         print(f"Error rendering image: {e}")
         print("Please make sure you have Playwright installed: pip install playwright")
         print("And install browser: playwright install chromium")
-        return False
+        return None  # Return None on failure
 
 if __name__ == "__main__":
     latest_story_file = get_latest_story_file()
