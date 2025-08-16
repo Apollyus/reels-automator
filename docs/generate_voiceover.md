@@ -1,7 +1,44 @@
 
 # Generate Voiceover
 
-This script is responsible for generating a voiceover from a story using the ElevenLabs API.
+This script is responsible for generating voiceovers from story data using the ElevenLabs API. It creates separate audio files for the title, story, and a combined version for flexible video composition.
+
+## Main Function: `generate_voiceover(story_data)`
+
+This function generates multiple voiceover files to provide flexibility in video composition.
+
+### Parameters
+
+- `story_data` (dict): The story data containing title and story text
+
+### Returns
+
+- `dict`: Dictionary with paths to generated audio files:
+  - `'title'`: Path to title-only audio file (`{timestamp}_title.mp3`)
+  - `'story'`: Path to story-only audio file (`{timestamp}_story.mp3`)
+  - `'combined'`: Path to combined title + story audio file (`{timestamp}.mp3`)
+- `None`: If generation failed
+
+### Generated Files
+
+1. **Title Audio**: Contains only the Reddit post title - perfect for opening image voiceover
+2. **Story Audio**: Contains only the story content - used during background video
+3. **Combined Audio**: Contains title + story together - for traditional single-audio approach
+
+### Process
+
+1. **API Authentication**: Validates ElevenLabs API key from environment
+2. **Title Generation**: Creates voiceover for the Reddit post title only
+3. **Story Generation**: Creates voiceover for the main story content only
+4. **Combined Generation**: Creates single audio file with title and story together
+5. **File Management**: Saves all three versions with consistent timestamps
+
+## Video Integration Benefits
+
+- **Title During Opening**: Title audio plays while Reddit post image is shown
+- **Story During Background**: Story audio plays while Minecraft parkour footage is shown  
+- **Seamless Transition**: Perfect timing synchronization between visual and audio elements
+- **Flexible Editing**: Separate files allow for independent timing adjustments
 
 ## Dependencies
 

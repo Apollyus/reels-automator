@@ -2,41 +2,57 @@
 
 This script is responsible for composing the final vertical video by combining all generated assets using FFmpeg.
 
-## Main Function: `compose_final_video(background_video_path, opening_image_path, voice_path, captions_path, output_path, opening_duration=3.0)`
+## Main Function: `compose_final_video(background_video_path, opening_image_path, title_voice_path, story_voice_path, captions_path, output_path, opening_duration=3.0)`
 
-This is the core function that uses FFmpeg to create the final video with all components.
+This is the core function that uses FFmpeg to create the final video with separate title and story audio for enhanced engagement.
 
 ### Parameters
 
 - `background_video_path` (str): Path to the Minecraft parkour background video
 - `opening_image_path` (str): Path to the Reddit post opening image (PNG)
-- `voice_path` (str): Path to the voiceover audio file (MP3)
+- `title_voice_path` (str): Path to the title voiceover audio file (MP3)
+- `story_voice_path` (str): Path to the story voiceover audio file (MP3)
 - `captions_path` (str): Path to the subtitle file (SRT)
 - `output_path` (str): Path where the final video will be saved
-- `opening_duration` (float): Duration to show opening image (default: 3.0 seconds)
+- `opening_duration` (float): Minimum duration for opening image (default: 3.0 seconds)
 
 ### Returns
 
 - `bool`: True if video composition was successful, False otherwise
 
+### Enhanced Audio Experience
+
+The function creates a sophisticated audio experience:
+1. **Title Audio**: Plays during the Reddit post opening image
+2. **Story Audio**: Plays during the Minecraft parkour background
+3. **Seamless Transition**: Audio flows naturally from title to story
+4. **Dynamic Timing**: Opening duration adjusts to title length automatically
+
 ### Process
 
-1. **Duration Analysis**: Uses FFprobe to get exact audio duration
-2. **Format Conversion**: Ensures all inputs are in the correct format for FFmpeg
-3. **Video Scaling**: Scales all video content to vertical 1080x1920 format
-4. **Layering**: Combines opening image + background video + audio + captions
-5. **Encoding**: Outputs high-quality MP4 suitable for social media platforms
+1. **Duration Analysis**: Uses FFprobe to get exact duration of both title and story audio
+2. **Smart Timing**: Automatically adjusts opening image duration to match title length
+3. **Format Conversion**: Ensures all inputs are in the correct format for FFmpeg
+4. **Video Scaling**: Scales all video content to vertical 1080x1920 format
+5. **Audio Sequencing**: Concatenates title and story audio for seamless playback
+6. **Layering**: Combines opening image + background video + sequential audio + captions
+7. **Encoding**: Outputs high-quality MP4 suitable for social media platforms
 
 ## Video Composition Structure
 
-### Timeline
+### Enhanced Timeline
 ```
-0s ────── 3s ─────────────────── End
-│         │                      │
-│ Opening │   Background Video   │
-│ Image   │   + Captions        │
-│         │   + Audio           │
+0s ──── Title Duration ──────────────── Total Duration
+│       │                              │
+│ Opening Image    │   Background Video │
+│ + Title Audio    │   + Story Audio   │
+│                  │   + Captions      │
 ```
+
+### Audio Flow
+1. **Title Phase**: Reddit post title spoken while image is displayed
+2. **Story Phase**: Main story narrated during Minecraft parkour footage
+3. **Captions**: Precisely timed subtitles throughout entire video
 
 ### Visual Layers (bottom to top)
 1. **Background Video**: Minecraft parkour footage (scaled to 1080x1920)
@@ -104,10 +120,13 @@ This will:
 
 Before running, ensure these files exist:
 - Latest story JSON in `stories/`
-- Latest voice MP3 in `voices/`
+- Latest title voice MP3 in `voices/` (ending with `_title.mp3`)
+- Latest story voice MP3 in `voices/` (ending with `_story.mp3`)
 - Latest image PNG in `images/`
 - Latest caption SRT in `captions/`
 - Background video in `background/`
+
+**Note**: Run `generate_voiceover.py` to create the separate title and story audio files required for enhanced video composition.
 
 ## Output Location
 
