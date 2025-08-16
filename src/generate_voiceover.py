@@ -1,8 +1,6 @@
 
 import os
 import json
-import os
-import json
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 import time
@@ -31,8 +29,8 @@ def get_latest_story_file():
 
 def generate_voiceover(story_data):
     """
-    Generates voiceovers from a story using the ElevenLabs API.
-    Creates separate files for title, story, and combined audio.
+    Generates voiceovers from a story using available TTS services.
+    Creates a combined audio file with fallback support.
 
     Args:
         story_data (dict): The story to generate voiceovers for.
@@ -40,15 +38,6 @@ def generate_voiceover(story_data):
     Returns:
         dict: Paths to generated audio files or None if error.
     """
-    api_key = os.environ.get("ELEVENLABS_API_KEY")
-    if not api_key:
-        print("Error: ELEVENLABS_API_KEY environment variable not set.")
-        return None
-    
-    elevenlabs = ElevenLabs(
-        api_key=os.getenv("ELEVENLABS_API_KEY"),
-    )
-
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     voices_dir = os.path.join(project_root, "voices")
@@ -56,39 +45,131 @@ def generate_voiceover(story_data):
         os.makedirs(voices_dir)
 
     timestamp = int(time.time())
-    
-    # Prepare file paths
-    title_path = os.path.join(voices_dir, f"{timestamp}_title.mp3")
-    story_path = os.path.join(voices_dir, f"{timestamp}_story.mp3")
     combined_path = os.path.join(voices_dir, f"{timestamp}.mp3")
     
-    results = {}
+    combined_text = f"{story_data['title']}. {story_data['story']}"
+    
+    # Try ElevenLabs first
+    api_key = os.environ.get("ELEVENLABS_API_KEY")
+    if api_key:
+        if generate_elevenlabs_tts(combined_text, combined_path, api_key):
+            return create_result_paths(combined_path)
+    
+    # Try OpenAI TTS as fallback
+    openai_key = os.environ.get("OPENAI_API_KEY")
+    if openai_key:
+        print("ElevenLabs failed, trying OpenAI TTS...")
+        if generate_openai_tts(combined_text, combined_path, openai_key):
+            return create_result_paths(combined_path)
+    
+    # Use offline fallback (test tone)
+    print("All TTS services failed, using offline test audio...")
+    if generate_offline_tts(combined_text, combined_path):
+        return create_result_paths(combined_path)
+    
+    return None
 
+def generate_elevenlabs_tts(text, output_path, api_key):
+    """Generate TTS using ElevenLabs API."""
     try:
-        # Generate combined voiceover (title + story) - SINGLE API CALL
-        print("Generating voiceover...")
-        combined_text = f"{story_data['title']}. {story_data['story']}"
-        combined_audio = elevenlabs.text_to_speech.convert(
-            text=combined_text,
+        print("Generating voiceover with ElevenLabs...")
+        elevenlabs = ElevenLabs(api_key=api_key)
+        
+        audio = elevenlabs.text_to_speech.convert(
+            text=text,
             voice_id="JBFqnCBsd6RMkjVDRZzb",
             model_id="eleven_multilingual_v2",
         )
-        with open(combined_path, "wb") as f:
-            for chunk in combined_audio:
+        with open(output_path, "wb") as f:
+            for chunk in audio:
                 f.write(chunk)
-        print(f"Voiceover saved to {combined_path}")
-        
-        # For backward compatibility, return all three paths pointing to the same file
-        # The video composition can use timing to determine when to play what
-        results['title'] = combined_path     # Use same file, extract timing later
-        results['story'] = combined_path     # Use same file, extract timing later  
-        results['combined'] = combined_path  # The actual generated file
-        
-        return results
-        
+        print(f"ElevenLabs voiceover saved to {output_path}")
+        return True
     except Exception as e:
-        print(f"Error generating voiceover: {e}")
-        return None
+        print(f"ElevenLabs TTS error: {e}")
+        return False
+
+def generate_openai_tts(text, output_path, api_key):
+    """Generate TTS using OpenAI API."""
+    try:
+        from openai import OpenAI
+        
+        print("Generating voiceover with OpenAI...")
+        client = OpenAI(api_key=api_key)
+        
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice="alloy",
+            input=text
+        )
+        
+        response.stream_to_file(output_path)
+        print(f"OpenAI voiceover saved to {output_path}")
+        return True
+    except Exception as e:
+        print(f"OpenAI TTS error: {e}")
+        return False
+
+def generate_offline_tts(text, output_path):
+    """Generate test audio for offline testing."""
+    try:
+        import wave
+        import struct
+        import math
+        
+        print("Generating test audio (offline mode)...")
+        
+        # Generate a simple tone for testing
+        duration = max(5.0, len(text) * 0.1)  # Rough estimate
+        sample_rate = 44100
+        frequency = 440
+        
+        # Generate sine wave
+        frames = []
+        for i in range(int(duration * sample_rate)):
+            sample = math.sin(2 * math.pi * frequency * i / sample_rate)
+            frames.append(struct.pack('<h', int(sample * 32767)))
+        
+        # Write WAV file first
+        wav_path = output_path.replace('.mp3', '.wav')
+        with wave.open(wav_path, 'wb') as wav_file:
+            wav_file.setnchannels(1)
+            wav_file.setsampwidth(2)
+            wav_file.setframerate(sample_rate)
+            wav_file.writeframes(b''.join(frames))
+        
+        # Convert to MP3 if possible
+        try:
+            from .compose_video import find_ffmpeg_path
+            ffmpeg_path, _ = find_ffmpeg_path()
+            if ffmpeg_path:
+                import subprocess
+                subprocess.run([
+                    ffmpeg_path, "-y", "-i", wav_path,
+                    "-c:a", "mp3", "-b:a", "128k", output_path
+                ], capture_output=True, check=True)
+                os.remove(wav_path)
+            else:
+                # Just rename WAV to MP3 if no ffmpeg
+                os.rename(wav_path, output_path)
+        except:
+            # Fallback: rename WAV to MP3
+            if os.path.exists(wav_path):
+                os.rename(wav_path, output_path)
+        
+        print(f"Test audio saved to {output_path}")
+        return True
+    except Exception as e:
+        print(f"Offline TTS error: {e}")
+        return False
+
+def create_result_paths(combined_path):
+    """Create result dictionary with all paths pointing to the same file."""
+    return {
+        'title': combined_path,
+        'story': combined_path,
+        'combined': combined_path
+    }
 
 if __name__ == "__main__":
     latest_story_file = get_latest_story_file()
