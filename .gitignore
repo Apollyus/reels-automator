@@ -9,3 +9,5 @@ voices/*
 captions/*
 exports/*
 ideas/*
+.cache/
+ideas/*

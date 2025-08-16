@@ -4,6 +4,11 @@ import json
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 import time
+import sys
+
+# Add src directory to path for imports
+sys.path.append(os.path.dirname(__file__))
+from cache_manager import get_story_cache_key, get_cache_paths, cache_exists, copy_from_cache, save_to_cache
 
 load_dotenv()
 
@@ -47,12 +52,26 @@ def generate_voiceover(story_data):
     timestamp = int(time.time())
     combined_path = os.path.join(voices_dir, f"{timestamp}.mp3")
     
+    # Check cache first
+    cache_key = get_story_cache_key(story_data)
+    cache_path = get_cache_paths(project_root, cache_key, "audio")
+    
+    if cache_exists(cache_path):
+        print(f"🎯 Using cached audio file...")
+        if copy_from_cache(cache_path, combined_path):
+            print(f"✅ Cached voiceover copied to {combined_path}")
+            return create_result_paths(combined_path)
+        else:
+            print("⚠️  Failed to copy from cache, generating new audio...")
+    
     combined_text = f"{story_data['title']}. {story_data['story']}"
     
     # Try ElevenLabs first
     api_key = os.environ.get("ELEVENLABS_API_KEY")
     if api_key:
         if generate_elevenlabs_tts(combined_text, combined_path, api_key):
+            # Save to cache
+            save_to_cache(combined_path, cache_path)
             return create_result_paths(combined_path)
     
     # Try OpenAI TTS as fallback
@@ -60,11 +79,15 @@ def generate_voiceover(story_data):
     if openai_key:
         print("ElevenLabs failed, trying OpenAI TTS...")
         if generate_openai_tts(combined_text, combined_path, openai_key):
+            # Save to cache
+            save_to_cache(combined_path, cache_path)
             return create_result_paths(combined_path)
     
     # Use offline fallback (test tone)
     print("All TTS services failed, using offline test audio...")
     if generate_offline_tts(combined_text, combined_path):
+        # Save to cache
+        save_to_cache(combined_path, cache_path)
         return create_result_paths(combined_path)
     
     return None
@@ -140,7 +163,7 @@ def generate_offline_tts(text, output_path):
         
         # Convert to MP3 if possible
         try:
-            from .compose_video import find_ffmpeg_path
+            from compose_video import find_ffmpeg_path
             ffmpeg_path, _ = find_ffmpeg_path()
             if ffmpeg_path:
                 import subprocess

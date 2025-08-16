@@ -4,6 +4,11 @@ import re
 from elevenlabs.client import ElevenLabs
 from dotenv import load_dotenv
 import time
+import sys
+
+# Add src directory to path for imports
+sys.path.append(os.path.dirname(__file__))
+from cache_manager import get_story_cache_key, get_cache_paths, cache_exists, copy_from_cache, save_to_cache
 
 load_dotenv()
 
@@ -84,6 +89,23 @@ def generate_captions(story_data, voice_file_path, words_per_chunk=4):
     # Create captions directory if it doesn't exist
     if not os.path.exists(captions_dir):
         os.makedirs(captions_dir)
+    
+    # Generate output path
+    voice_filename = os.path.basename(voice_file_path)
+    srt_filename = voice_filename.replace('.mp3', '.srt')
+    srt_path = os.path.join(captions_dir, srt_filename)
+    
+    # Check cache first
+    cache_key = get_story_cache_key(story_data)
+    cache_path = get_cache_paths(project_root, cache_key, "captions")
+    
+    if cache_exists(cache_path):
+        print(f"🎯 Using cached captions file...")
+        if copy_from_cache(cache_path, srt_path):
+            print(f"✅ Cached captions copied to {srt_path}")
+            return srt_path
+        else:
+            print("⚠️  Failed to copy from cache, generating new captions...")
     
     # Initialize ElevenLabs client
     api_key = os.environ.get("ELEVENLABS_API_KEY")
@@ -185,12 +207,6 @@ def generate_captions(story_data, voice_file_path, words_per_chunk=4):
             srt_content.append(chunk['text'])
             srt_content.append("")  # Empty line between entries
         
-        # Generate filename based on voice file
-        voice_filename = os.path.basename(voice_file_path)
-        timestamp = os.path.splitext(voice_filename)[0]
-        srt_filename = f"{timestamp}.srt"
-        srt_path = os.path.join(captions_dir, srt_filename)
-        
         # Write SRT file
         with open(srt_path, 'w', encoding='utf-8') as f:
             f.write('\n'.join(srt_content))
@@ -198,6 +214,9 @@ def generate_captions(story_data, voice_file_path, words_per_chunk=4):
         print(f"Captions generated: {srt_path}")
         print(f"Total duration: {chunks[-1]['end']:.2f} seconds")
         print(f"Number of caption chunks: {len(chunks)}")
+        
+        # Save to cache
+        save_to_cache(srt_path, cache_path)
         
         return srt_path
         
