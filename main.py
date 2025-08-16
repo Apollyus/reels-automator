@@ -248,7 +248,9 @@ def generate_single_video(background_video_path, video_number, total_videos):
         voiceover_paths['title'],
         voiceover_paths['story'],
         captions_path,
-        output_path
+        output_path,
+        3.0,  # opening_duration
+        story_data  # Add story_data parameter
     )
     
     if video_success:

@@ -185,7 +185,109 @@ def get_audio_duration(audio_path):
         print(f"Error getting audio duration: {e}")
         return None
 
-def compose_final_video(background_video_path, opening_image_path, title_voice_path, story_voice_path, captions_path, output_path, opening_duration=3.0):
+def create_story_only_srt(original_srt_path, output_srt_path, start_time):
+    """
+    Creates a new SRT file containing only subtitles after the specified start time.
+    
+    Args:
+        original_srt_path (str): Path to the original SRT file.
+        output_srt_path (str): Path for the new story-only SRT file.
+        start_time (float): Time in seconds when story begins.
+    """
+    try:
+        with open(original_srt_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        blocks = content.strip().split('\n\n')
+        story_blocks = []
+        subtitle_index = 1
+        
+        for block in blocks:
+            lines = block.strip().split('\n')
+            if len(lines) >= 3:
+                time_line = lines[1]
+                text = lines[2]
+                
+                if '-->' in time_line:
+                    # Parse start time
+                    start_time_str = time_line.split('-->')[0].strip()
+                    time_parts = start_time_str.replace(',', '.').split(':')
+                    if len(time_parts) == 3:
+                        hours = float(time_parts[0])
+                        minutes = float(time_parts[1])
+                        seconds = float(time_parts[2])
+                        subtitle_start = hours * 3600 + minutes * 60 + seconds
+                        
+                        # Only include subtitles that start after the title ends
+                        if subtitle_start >= start_time:
+                            story_blocks.append(f"{subtitle_index}\n{time_line}\n{text}")
+                            subtitle_index += 1
+        
+        # Write the story-only SRT file
+        with open(output_srt_path, 'w', encoding='utf-8') as f:
+            f.write('\n\n'.join(story_blocks))
+        
+        print(f"Created story-only SRT: {len(story_blocks)} subtitles starting from {start_time:.3f}s")
+        
+    except Exception as e:
+        print(f"Error creating story-only SRT: {e}")
+        # Fallback: copy original file
+        import shutil
+        shutil.copy2(original_srt_path, output_srt_path)
+
+def get_title_end_time(captions_path, story_data):
+    """
+    Analyzes the SRT file to find when the title reading ends.
+    
+    Args:
+        captions_path (str): Path to the SRT file.
+        story_data (dict): Story data containing the title.
+    
+    Returns:
+        float: Time in seconds when title ends, default 4.5 if not found.
+    """
+    try:
+        title_words = story_data['title'].lower().split()
+        if not title_words:
+            return 4.5
+        
+        # Look for the last word of the title in the SRT file
+        last_title_word = title_words[-1].rstrip('.,!?')
+        
+        with open(captions_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Split into subtitle blocks
+        blocks = content.strip().split('\n\n')
+        
+        for block in blocks:
+            lines = block.strip().split('\n')
+            if len(lines) >= 3:
+                time_line = lines[1]
+                text_line = lines[2].lower().strip()
+                
+                # Check if this contains the last word of the title
+                if last_title_word in text_line:
+                    # Extract end time
+                    if '-->' in time_line:
+                        end_time_str = time_line.split('-->')[1].strip()
+                        # Parse HH:MM:SS,mmm format
+                        time_parts = end_time_str.replace(',', '.').split(':')
+                        if len(time_parts) == 3:
+                            hours = float(time_parts[0])
+                            minutes = float(time_parts[1])
+                            seconds = float(time_parts[2])
+                            total_seconds = hours * 3600 + minutes * 60 + seconds
+                            # Add small buffer to ensure title is fully read
+                            return total_seconds + 0.5
+        
+        # Fallback if parsing fails
+        return 4.5
+    except Exception as e:
+        print(f"Warning: Could not parse title end time: {e}")
+        return 4.5
+
+def compose_final_video(background_video_path, opening_image_path, title_voice_path, story_voice_path, captions_path, output_path, opening_duration=3.0, story_data=None):
     """
     Composes the final video using FFmpeg with combined audio.
     Note: title_voice_path and story_voice_path now point to the same combined audio file.
@@ -215,6 +317,23 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         if not total_audio_duration:
             print("Failed to get audio duration")
             return False
+        
+        # Get EXACT title end time by counting words in SRT file
+        title_end_time = 4.5  # Default fallback
+        if story_data:
+            try:
+                # Import the exact timing algorithm
+                import sys
+                sys.path.append(os.path.dirname(__file__))
+                from timing_algorithms import get_title_end_time_exact
+                
+                title_end_time = get_title_end_time_exact(captions_path, story_data)
+            except Exception as e:
+                print(f"Warning: Exact timing failed, using fallback: {e}")
+                # Fallback to original simple method
+                title_end_time = get_title_end_time(captions_path, story_data)
+        
+        print(f"🎯 Title reading ends EXACTLY at: {title_end_time:.3f} seconds")
         
         # Use fixed opening duration, then remaining time for background
         actual_opening_duration = max(opening_duration, 3.0)  # Minimum 3 seconds
@@ -250,7 +369,7 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
             "-filter_complex",
             f"[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg_full];"
             f"[0:v]scale=1000:-1:force_original_aspect_ratio=decrease[post_scaled];"
-            f"[bg_full][post_scaled]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,{actual_opening_duration})'[opening_with_overlay];"
+            f"[bg_full][post_scaled]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,{title_end_time})'[opening_with_overlay];"
             f"[1:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg_only];"
             f"[opening_with_overlay][bg_only]concat=n=2:v=1:a=0[video]",
             
@@ -274,36 +393,19 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         print("Running FFmpeg command (Step 1: Video without subtitles)...")
         result = subprocess.run(cmd1, capture_output=True, text=True, check=True)
         
-        # Step 2: Add subtitles to the video
-        # Use relative path for subtitles to avoid Windows path issues
+        # Step 2: Add subtitles to the video (only after title ends)
+        # Note: FFmpeg subtitles filter doesn't support enable option, so we use drawtext
         rel_captions_path = os.path.relpath(captions_path).replace('\\', '/')
+        
+        # Create a modified SRT file that starts from title_end_time
+        temp_srt_path = captions_path.replace('.srt', '_story_only.srt')
+        create_story_only_srt(captions_path, temp_srt_path, title_end_time)
+        rel_temp_srt = os.path.relpath(temp_srt_path).replace('\\', '/')
         
         cmd2 = [
             ffmpeg_path, "-y",
             "-i", temp_video,
-            "-vf", f"subtitles='{rel_captions_path}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
-            "-c:a", "copy",  # Copy audio without re-encoding
-            output_path
-        ]
-        
-        print("Running FFmpeg command (Step 2: Adding subtitles)...")
-        result = subprocess.run(cmd2, capture_output=True, text=True, check=True)
-        
-        # Clean up temp file
-        if os.path.exists(temp_video):
-            os.remove(temp_video)
-        
-        print("Running FFmpeg command (Step 1: Video without subtitles)...")
-        result = subprocess.run(cmd1, capture_output=True, text=True, check=True)
-        
-        # Step 2: Add subtitles to the video
-        # Use relative path for subtitles to avoid Windows path issues
-        rel_captions_path = os.path.relpath(captions_path).replace('\\', '/')
-        
-        cmd2 = [
-            ffmpeg_path, "-y",
-            "-i", temp_video,
-            "-vf", f"subtitles='{rel_captions_path}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
+            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
             "-c:a", "copy",  # Copy audio without re-encoding
             output_path
         ]
@@ -315,7 +417,6 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         if os.path.exists(temp_video):
             os.remove(temp_video)
             
-        
         print("Video composition completed successfully!")
         return True
         
