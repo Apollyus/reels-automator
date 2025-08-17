@@ -287,19 +287,21 @@ def get_title_end_time(captions_path, story_data):
         print(f"Warning: Could not parse title end time: {e}")
         return 4.5
 
-def compose_final_video(background_video_path, opening_image_path, title_voice_path, story_voice_path, captions_path, output_path, opening_duration=3.0, story_data=None):
+def compose_final_video(background_video_path, opening_image_path, title_voice_path, story_voice_path, captions_path, output_path, opening_duration=3.0, story_data=None, background_video_path_2=None):
     """
     Composes the final video using FFmpeg with combined audio.
     Note: title_voice_path and story_voice_path now point to the same combined audio file.
 
     Args:
-        background_video_path (str): Path to the background Minecraft video.
+        background_video_path (str): Path to the first background Minecraft video (top half).
         opening_image_path (str): Path to the opening Reddit post image.
         title_voice_path (str): Path to the combined voiceover audio (same as story_voice_path).
         story_voice_path (str): Path to the combined voiceover audio (same as title_voice_path).
         captions_path (str): Path to the SRT caption file.
         output_path (str): Path for the output video.
         opening_duration (float): Duration to show opening image (default: 3.0 seconds).
+        story_data: Story data for timing calculations.
+        background_video_path_2 (str): Optional path to the second background video (bottom half).
 
     Returns:
         bool: True if successful, False otherwise.
@@ -349,47 +351,97 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         combined_voice_path = title_voice_path.replace('\\', '/')  # Use combined audio
         output_path = output_path.replace('\\', '/')
         
+        # Handle second background video path if provided
+        if background_video_path_2:
+            background_video_path_2 = background_video_path_2.replace('\\', '/')
+        
         # Create temp video without subtitles first
         temp_video = output_path.replace('.mp4', '_temp.mp4')
         
-        # Step 1: Create video without subtitles - simple overlay approach
-        cmd1 = [
-            ffmpeg_path, "-y",  # Overwrite output file
-            
-            # Input 1: Background video (main video throughout)
-            "-i", background_video_path,
-            
-            # Input 2: Reddit post image
-            "-loop", "1", "-i", opening_image_path,
-            
-            # Input 3: Combined audio (full audio track)
-            "-i", combined_voice_path,
-            
-            # Filter complex: background video with fast scaling
-            "-filter_complex",
-            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg];"
-            f"[1:v]scale=1000:-1:force_original_aspect_ratio=decrease[post];"
-            f"[bg][post]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,{title_end_time})'[video]",
-            
-            # Map the video and audio
-            "-map", "[video]", "-map", "2:a",
-            
-            # FAST encoding settings - prioritize speed over quality
-            "-c:v", "libx264", 
-            "-preset", "ultrafast",   # Fastest encoding preset
-            "-crf", "23",             # Reasonable quality, much faster
-            "-pix_fmt", "yuv420p",
-            "-movflags", "+faststart",
-            
-            # Audio settings
-            "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
-            
-            # Duration (match total audio duration)
-            "-t", str(total_audio_duration),
-            
-            # Output temp video
-            temp_video
-        ]
+        # Prepare FFmpeg command based on whether we have one or two background videos
+        if background_video_path_2:
+            # Step 1: Create video with two stacked background videos
+            cmd1 = [
+                ffmpeg_path, "-y",  # Overwrite output file
+                
+                # Input 0: First background video (top half)
+                "-i", background_video_path,
+                
+                # Input 1: Second background video (bottom half)
+                "-i", background_video_path_2,
+                
+                # Input 2: Reddit post image
+                "-loop", "1", "-i", opening_image_path,
+                
+                # Input 3: Combined audio (full audio track)
+                "-i", combined_voice_path,
+                
+                # Filter complex: stack two background videos and overlay post image
+                "-filter_complex",
+                f"[0:v]scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[bg1];"
+                f"[1:v]scale=1080:960:force_original_aspect_ratio=increase,crop=1080:960[bg2];"
+                f"[bg1][bg2]vstack=inputs=2[bg_stacked];"
+                f"[2:v]scale=1000:-1:force_original_aspect_ratio=decrease[post];"
+                f"[bg_stacked][post]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,{title_end_time})'[video]",
+                
+                # Map the video and audio
+                "-map", "[video]", "-map", "3:a",
+                
+                # FAST encoding settings - prioritize speed over quality
+                "-c:v", "libx264", 
+                "-preset", "ultrafast",   # Fastest encoding preset
+                "-crf", "23",             # Reasonable quality, much faster
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                
+                # Audio settings
+                "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+                
+                # Duration (match total audio duration)
+                "-t", str(total_audio_duration),
+                
+                # Output temp video
+                temp_video
+            ]
+        else:
+            # Step 1: Create video with single background video (original behavior)
+            cmd1 = [
+                ffmpeg_path, "-y",  # Overwrite output file
+                
+                # Input 0: Background video (main video throughout)
+                "-i", background_video_path,
+                
+                # Input 1: Reddit post image
+                "-loop", "1", "-i", opening_image_path,
+                
+                # Input 2: Combined audio (full audio track)
+                "-i", combined_voice_path,
+                
+                # Filter complex: background video with fast scaling
+                "-filter_complex",
+                f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg];"
+                f"[1:v]scale=1000:-1:force_original_aspect_ratio=decrease[post];"
+                f"[bg][post]overlay=(W-w)/2:(H-h)/2:enable='between(t,0,{title_end_time})'[video]",
+                
+                # Map the video and audio
+                "-map", "[video]", "-map", "2:a",
+                
+                # FAST encoding settings - prioritize speed over quality
+                "-c:v", "libx264", 
+                "-preset", "ultrafast",   # Fastest encoding preset
+                "-crf", "23",             # Reasonable quality, much faster
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                
+                # Audio settings
+                "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+                
+                # Duration (match total audio duration)
+                "-t", str(total_audio_duration),
+                
+                # Output temp video
+                temp_video
+            ]
         
         print("Running FFmpeg command (Step 1: Video without subtitles)...")
         print(f"Command: {' '.join(cmd1)}")
@@ -440,12 +492,13 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         print(f"Error during video composition: {e}")
         return False
 
-def main(background_video_filename=None):
+def main(background_video_filename=None, background_video_filename_2=None):
     """
     Main function to compose the final video from the latest generated assets.
 
     Args:
-        background_video_filename (str): Optional specific background video filename.
+        background_video_filename (str): Optional specific background video filename for top half.
+        background_video_filename_2 (str): Optional specific background video filename for bottom half.
     """
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
@@ -476,7 +529,7 @@ def main(background_video_filename=None):
         print("Note: Run generate_voiceover.py to create separate title and story audio files.")
         return
     
-    # Get background video
+    # Get background video(s)
     background_dir = os.path.join(project_root, "background")
     if background_video_filename:
         background_video_path = os.path.join(background_dir, background_video_filename)
@@ -495,7 +548,18 @@ def main(background_video_filename=None):
             return
         
         background_video_path = os.path.join(background_dir, video_files[0])
-        print(f"Using background video: {video_files[0]}")
+        print(f"Using background video (top): {video_files[0]}")
+    
+    # Get second background video if specified
+    background_video_path_2 = None
+    if background_video_filename_2:
+        background_video_path_2 = os.path.join(background_dir, background_video_filename_2)
+        if not os.path.exists(background_video_path_2):
+            print(f"Specified second background video not found: {background_video_filename_2}")
+            return
+        print(f"Using second background video (bottom): {background_video_filename_2}")
+    elif background_video_filename:
+        print("Note: Using single background video. Specify --background2 for split-screen effect.")
     
     # Create output directory
     exports_dir = os.path.join(project_root, "exports")
@@ -514,6 +578,8 @@ def main(background_video_filename=None):
     print(f"Image: {os.path.basename(image_file)}")
     print(f"Captions: {os.path.basename(caption_file)}")
     print(f"Background: {os.path.basename(background_video_path)}")
+    if background_video_path_2:
+        print(f"Background 2: {os.path.basename(background_video_path_2)}")
     print(f"Output: {output_filename}")
     
     # Compose the video
@@ -523,7 +589,8 @@ def main(background_video_filename=None):
         title_voice_path=title_voice_file,
         story_voice_path=story_voice_file,
         captions_path=caption_file,
-        output_path=output_path
+        output_path=output_path,
+        background_video_path_2=background_video_path_2
     )
     
     if success:
@@ -536,6 +603,7 @@ def main(background_video_filename=None):
 if __name__ == "__main__":
     import sys
     
-    # Allow passing background video filename as argument
+    # Allow passing background video filenames as arguments
     background_video = sys.argv[1] if len(sys.argv) > 1 else None
-    main(background_video)
+    background_video_2 = sys.argv[2] if len(sys.argv) > 2 else None
+    main(background_video, background_video_2)

@@ -3,7 +3,7 @@
 Minecraft Reddit Story Reels Generator - Main Pipeline
 Automated pipeline that generates Reddit story videos with Minecraft parkour footage.
 
-Usage: python main.py --count <number_of_videos> --background <background_video_filename>
+Usage: python main.py --count <number_of_videos> --background <background_video_filename> [--background2 <second_background_video_filename>]
 """
 
 import argparse
@@ -138,14 +138,15 @@ def run_pipeline_step(step_name, step_function, *args, **kwargs):
         print(f"   Error: {str(e)}")
         return None
 
-def generate_single_video(background_video_path, video_number, total_videos):
+def generate_single_video(background_video_path, video_number, total_videos, background_video_path_2=None):
     """
     Generate a single video through the complete pipeline.
     
     Args:
-        background_video_path (str): Path to the background video.
+        background_video_path (str): Path to the first background video.
         video_number (int): Current video number (for display).
         total_videos (int): Total number of videos being generated.
+        background_video_path_2 (str): Optional path to the second background video.
     
     Returns:
         bool: True if successful, False otherwise.
@@ -250,7 +251,8 @@ def generate_single_video(background_video_path, video_number, total_videos):
         captions_path,
         output_path,
         3.0,  # opening_duration
-        story_data  # Add story_data parameter
+        story_data,  # Add story_data parameter
+        background_video_path_2  # Add second background video parameter
     )
     
     if video_success:
@@ -283,6 +285,7 @@ def main():
 Examples:
   python main.py --count 1 --background minecraft_parkour.mp4
   python main.py --count 5 --background parkour_loop.mp4
+  python main.py --count 1 --background parkour1.mp4 --background2 parkour2.mp4
   
 Make sure to:
 1. Add background videos to 'background/' directory
@@ -302,7 +305,14 @@ Make sure to:
         "--background",
         type=str,
         required=True,
-        help="Filename of the background video from the 'background/' directory"
+        help="Filename of the background video from the 'background/' directory (will be top half if --background2 is used)"
+    )
+    
+    parser.add_argument(
+        "--background2",
+        type=str,
+        required=False,
+        help="Optional: Filename of the second background video from the 'background/' directory (will be bottom half)"
     )
     
     parser.add_argument(
@@ -328,13 +338,24 @@ Make sure to:
     if not background_video_path:
         sys.exit(1)
     
+    # Validate second background video if provided
+    background_video_path_2 = None
+    if args.background2:
+        background_video_path_2 = validate_background_video(args.background2)
+        if not background_video_path_2:
+            sys.exit(1)
+    
     # Print startup information
     print("🚀 Minecraft Reddit Story Reels Generator")
     print("=" * 50)
     print(f"📊 Generating {args.count} video(s)")
     print(f"🎮 Background video: {args.background}")
+    if args.background2:
+        print(f"🎮 Second background video: {args.background2}")
     print(f"📝 Words per caption: {args.words_per_chunk}")
     print(f"📁 Background path: {background_video_path}")
+    if background_video_path_2:
+        print(f"📁 Second background path: {background_video_path_2}")
     
     # Check dependencies
     print(f"\n🔍 Checking dependencies...")
@@ -356,7 +377,7 @@ Make sure to:
     start_time = time.time()
     
     for video_num in range(1, args.count + 1):
-        success = generate_single_video(background_video_path, video_num, args.count)
+        success = generate_single_video(background_video_path, video_num, args.count, background_video_path_2)
         
         if success:
             successful_videos += 1
