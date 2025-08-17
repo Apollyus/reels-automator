@@ -392,7 +392,13 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         ]
         
         print("Running FFmpeg command (Step 1: Video without subtitles)...")
-        result = subprocess.run(cmd1, capture_output=True, text=True, check=True)
+        print(f"Command: {' '.join(cmd1)}")
+        try:
+            result = subprocess.run(cmd1, capture_output=True, text=True, check=True, timeout=300)  # 5 minute timeout
+            print("Step 1 completed successfully!")
+        except subprocess.TimeoutExpired:
+            print("FFmpeg timed out after 5 minutes - killing process...")
+            return False
         
         # Step 2: Add subtitles to the video (only after title ends)
         # Note: FFmpeg subtitles filter doesn't support enable option, so we use drawtext
@@ -406,14 +412,18 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         cmd2 = [
             ffmpeg_path, "-y",
             "-i", temp_video,
-            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontname=Arial,Fontsize=26,Bold=1,PrimaryColour=&H0000ffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=120,BorderStyle=0,ScaleX=110,ScaleY=100'",
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",  # Fast encoding for subtitles
+            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
+            "-c:v", "libx264", "-preset", "medium", "-crf", "23",
             "-c:a", "copy",  # Copy audio without re-encoding
             output_path
         ]
         
         print("Running FFmpeg command (Step 2: Adding subtitles)...")
-        result = subprocess.run(cmd2, capture_output=True, text=True, check=True)
+        try:
+            result = subprocess.run(cmd2, capture_output=True, text=True, check=True, timeout=300)  # 5 minute timeout
+        except subprocess.TimeoutExpired:
+            print("FFmpeg subtitle step timed out after 5 minutes - killing process...")
+            return False
         
         # Clean up temp file
         if os.path.exists(temp_video):
