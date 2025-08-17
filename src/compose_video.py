@@ -365,7 +365,7 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
             # Input 3: Combined audio (full audio track)
             "-i", combined_voice_path,
             
-            # Filter complex: background video with timed overlay
+            # Filter complex: background video with fast scaling
             "-filter_complex",
             f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[bg];"
             f"[1:v]scale=1000:-1:force_original_aspect_ratio=decrease[post];"
@@ -374,12 +374,15 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
             # Map the video and audio
             "-map", "[video]", "-map", "2:a",
             
-            # Video settings for social media (vertical format)
-            "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+            # FAST encoding settings - prioritize speed over quality
+            "-c:v", "libx264", 
+            "-preset", "ultrafast",   # Fastest encoding preset
+            "-crf", "23",             # Reasonable quality, much faster
             "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart",
             
             # Audio settings
-            "-c:a", "aac", "-b:a", "128k",
+            "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
             
             # Duration (match total audio duration)
             "-t", str(total_audio_duration),
@@ -403,7 +406,8 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         cmd2 = [
             ffmpeg_path, "-y",
             "-i", temp_video,
-            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
+            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontname=Arial,Fontsize=26,Bold=1,PrimaryColour=&H0000ffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=120,BorderStyle=0,ScaleX=110,ScaleY=100'",
+            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "23",  # Fast encoding for subtitles
             "-c:a", "copy",  # Copy audio without re-encoding
             output_path
         ]
