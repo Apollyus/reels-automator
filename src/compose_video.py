@@ -235,6 +235,79 @@ def create_story_only_srt(original_srt_path, output_srt_path, start_time):
         import shutil
         shutil.copy2(original_srt_path, output_srt_path)
 
+def create_animated_subtitles_filter(srt_path, title_end_time):
+    """
+    Create FFmpeg drawtext filters for animated subtitles with pop-up effect.
+    
+    Args:
+        srt_path (str): Path to the SRT file.
+        title_end_time (float): When to start showing subtitles.
+    
+    Returns:
+        str: FFmpeg filter string for animated subtitles.
+    """
+    try:
+        with open(srt_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        blocks = content.strip().split('\n\n')
+        filters = []
+        
+        for block in blocks:
+            lines = block.strip().split('\n')
+            if len(lines) >= 3:
+                time_line = lines[1]
+                text = lines[2].replace("'", "\\'")  # Escape single quotes
+                
+                if '-->' in time_line:
+                    # Parse timing
+                    start_time_str, end_time_str = time_line.split('-->')
+                    
+                    # Parse start time
+                    start_parts = start_time_str.strip().replace(',', '.').split(':')
+                    if len(start_parts) == 3:
+                        start_hours = float(start_parts[0])
+                        start_minutes = float(start_parts[1])
+                        start_seconds = float(start_parts[2])
+                        start_time = start_hours * 3600 + start_minutes * 60 + start_seconds
+                    
+                    # Parse end time
+                    end_parts = end_time_str.strip().replace(',', '.').split(':')
+                    if len(end_parts) == 3:
+                        end_hours = float(end_parts[0])
+                        end_minutes = float(end_parts[1])
+                        end_seconds = float(end_parts[2])
+                        end_time = end_hours * 3600 + end_minutes * 60 + end_seconds
+                    
+                    # Only include if starts after title end time
+                    if start_time >= title_end_time:
+                        # Animation: scale from 0 to 1 over first 0.2 seconds, then normal size
+                        scale_expr = f"if(lt(t-{start_time},0.2),0.7+0.3*(t-{start_time})/0.2,1.0)"
+                        
+                        # Create drawtext filter with pop-up animation
+                        filter_text = (
+                            f"drawtext=text='{text}'"
+                            f":fontfile='C\\:/Windows/Fonts/arial.ttf'"
+                            f":fontsize=26*{scale_expr}"
+                            f":fontcolor=yellow"
+                            f":borderw=3*{scale_expr}"
+                            f":bordercolor=black"
+                            f":x=(w-text_w)/2"
+                            f":y=h-120-text_h"
+                            f":enable='between(t,{start_time},{end_time})'"
+                        )
+                        filters.append(filter_text)
+        
+        # Combine all filters
+        if filters:
+            return ",".join(filters)
+        else:
+            return ""
+            
+    except Exception as e:
+        print(f"Error creating animated subtitles: {e}")
+        return ""
+
 def get_title_end_time(captions_path, story_data):
     """
     Analyzes the SRT file to find when the title reading ends.
@@ -452,25 +525,37 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
             print("FFmpeg timed out after 5 minutes - killing process...")
             return False
         
-        # Step 2: Add subtitles to the video (only after title ends)
-        # Note: FFmpeg subtitles filter doesn't support enable option, so we use drawtext
-        rel_captions_path = os.path.relpath(captions_path).replace('\\', '/')
-        
+        # Step 2: Add animated subtitles to the video (only after title ends)
         # Create a modified SRT file that starts from title_end_time
         temp_srt_path = captions_path.replace('.srt', '_story_only.srt')
         create_story_only_srt(captions_path, temp_srt_path, title_end_time)
-        rel_temp_srt = os.path.relpath(temp_srt_path).replace('\\', '/')
         
-        cmd2 = [
-            ffmpeg_path, "-y",
-            "-i", temp_video,
-            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontname=Arial,Fontsize=26,Bold=1,PrimaryColour=&H0000ffff,OutlineColour=&H00000000,Outline=2,Shadow=2,Alignment=2,MarginV=120'",
-            "-c:v", "libx264", "-preset", "medium", "-crf", "23",
-            "-c:a", "copy",  # Copy audio without re-encoding
-            output_path
-        ]
+        # Create animated subtitle filters
+        animated_filter = create_animated_subtitles_filter(temp_srt_path, title_end_time)
         
-        print("Running FFmpeg command (Step 2: Adding subtitles)...")
+        if animated_filter:
+            # Use drawtext with animations
+            cmd2 = [
+                ffmpeg_path, "-y",
+                "-i", temp_video,
+                "-vf", animated_filter,
+                "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+                "-c:a", "copy",  # Copy audio without re-encoding
+                output_path
+            ]
+        else:
+            # Fallback to simple subtitles if animation fails
+            rel_temp_srt = os.path.relpath(temp_srt_path).replace('\\', '/')
+            cmd2 = [
+                ffmpeg_path, "-y",
+                "-i", temp_video,
+                "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontname=Arial,Fontsize=26,Bold=1,PrimaryColour=&H0000ffff,OutlineColour=&H00000000,Outline=3,Shadow=2,Alignment=2,MarginV=120'",
+                "-c:v", "libx264", "-preset", "medium", "-crf", "23",
+                "-c:a", "copy",  # Copy audio without re-encoding
+                output_path
+            ]
+        
+        print("Running FFmpeg command (Step 2: Adding animated subtitles)...")
         try:
             result = subprocess.run(cmd2, capture_output=True, text=True, check=True, timeout=300)  # 5 minute timeout
         except subprocess.TimeoutExpired:
