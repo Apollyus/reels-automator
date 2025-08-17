@@ -412,7 +412,7 @@ def compose_final_video(background_video_path, opening_image_path, title_voice_p
         cmd2 = [
             ffmpeg_path, "-y",
             "-i", temp_video,
-            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontsize=24,PrimaryColour=&H00ffffff,OutlineColour=&H00000000,Outline=2,Shadow=1,Alignment=2,MarginV=100'",
+            "-vf", f"subtitles='{rel_temp_srt}':force_style='Fontsize=28,Bold=1,PrimaryColour=&H0000ffff,OutlineColour=&H00000000,Outline=3,Shadow=2,Alignment=2,MarginV=120'",
             "-c:v", "libx264", "-preset", "medium", "-crf", "23",
             "-c:a", "copy",  # Copy audio without re-encoding
             output_path
